@@ -1,0 +1,43 @@
+# Xcode & Swift workspace
+DerivedData/
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+
+# Swift Package Manager
+dependencies-state.json
+.swiftpm/
+.build/
+
+# CocoaPods (if added later)
+Pods/
+
+# Carthage (safety if introduced)
+Carthage/Build/
+
+# Fastlane outputs
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Temporary files
+*.moved-aside
+*.xcuserstate
+*.swp
+*.swo
+.DS_Store
+
+# Crash logs & profiling
+*.dSYM.zip
+*.dSYM
+
+# Tuist / Project generation
+Tuist/Derived/

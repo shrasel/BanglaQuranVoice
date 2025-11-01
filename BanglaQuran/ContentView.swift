@@ -8,14 +8,15 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var appEnvironment = AppEnvironment()
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        SurahListView()
+            .environmentObject(appEnvironment)
+            .environmentObject(appEnvironment.surahListViewModel)
+            .environmentObject(appEnvironment.playbackViewModel)
+            .environmentObject(appEnvironment.preferencesViewModel)
+            .environmentObject(appEnvironment.progressViewModel)
     }
 }
 

@@ -8,10 +8,17 @@
 import SwiftUI
 
 @main
-struct BanglaQuranApp: App {
+struct QuranBanglaPlayerApp: App {
+    @StateObject private var environment = AppEnvironment()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SurahListView()
+                .environmentObject(environment)
+                .environmentObject(environment.surahListViewModel)
+                .environmentObject(environment.playbackViewModel)
+                .environmentObject(environment.preferencesViewModel)
+                .environmentObject(environment.progressViewModel)
         }
     }
 }
