@@ -6,7 +6,8 @@ final class SurahDetailViewModel: ObservableObject {
     struct AyahItem: Identifiable {
         let ayah: Ayah
         var status: AyahProgressState
-        var isPlaying: Bool
+        var isCurrent: Bool
+        var isActivelyPlaying: Bool
 
         var id: String { ayah.id }
     }
@@ -29,6 +30,9 @@ final class SurahDetailViewModel: ObservableObject {
     @Published private(set) var currentTrack: AudioTrack = .arabicRecitation
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var isSurahActive: Bool = false
+    @Published private(set) var isSurahPlaying: Bool = false
+    @Published private(set) var focusedAyahId: String?
     @Published var showBanglaText: Bool
     @Published private(set) var downloadSummary: DownloadSummary
 
@@ -56,11 +60,12 @@ final class SurahDetailViewModel: ObservableObject {
         self.showBanglaText = preferencesStore.showBanglaText
         self.downloadSummary = DownloadSummary(downloadedCount: 0, totalCount: surah.ayahCount, totalBytes: 0)
 
-        playbackService.$currentAyah
-            .combineLatest(playbackService.$currentSurah)
+        Publishers.CombineLatest3(playbackService.$currentSurah,
+                                   playbackService.$currentAyah,
+                                   playbackService.$isPlaying)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] ayah, surah in
-                Task { await self?.updateCurrentAyah(ayah: ayah, surah: surah) }
+            .sink { [weak self] surah, ayah, isPlaying in
+                self?.updatePlaybackState(currentSurah: surah, currentAyah: ayah, isPlaying: isPlaying)
             }
             .store(in: &cancellables)
 
@@ -74,7 +79,7 @@ final class SurahDetailViewModel: ObservableObject {
         progressStore.$snapshot
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                Task { await self?.refreshStatuses() }
+                self?.refreshStatuses()
             }
             .store(in: &cancellables)
 
@@ -95,32 +100,65 @@ final class SurahDetailViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    func load() async {
-        guard ayat.isEmpty else { return }
+    func load(force: Bool = false) async {
+        guard force || ayat.isEmpty else { return }
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
         do {
             let ayahModels = try await repository.loadAyat(for: surah.id)
             ayat = ayahModels.map { model in
                 AyahItem(ayah: model,
                          status: progressStore.status(for: surah.id, ayahNumber: model.numberInSurah),
-                         isPlaying: false)
+                         isCurrent: false,
+                         isActivelyPlaying: false)
             }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func play(ayah item: AyahItem) async {
+    func selectTrack(_ track: AudioTrack) async {
+        guard currentTrack != track else { return }
+        currentTrack = track
+        await playbackService.setTrack(track)
+    }
+
+    func handlePrimaryAction() async {
+        if isSurahActive {
+            playbackService.togglePlayPause()
+            return
+        }
+        await playFromBeginning()
+    }
+
+    func playFromBeginning() async {
+        if ayat.isEmpty {
+            await load(force: true)
+        }
+        guard let first = ayat.first else { return }
         await playbackService.play(surah: surah,
-                                   ayah: item.ayah,
+                                   ayah: first.ayah,
                                    track: currentTrack,
                                    startTime: 0,
                                    userInitiated: true)
     }
 
-    func toggleTrack() async {
-        await playbackService.toggleTrack()
+    func restartSurah() async {
+        await playFromBeginning()
+    }
+
+    func handleAyahTapped(_ item: AyahItem) async {
+        let isSameAyah = isSurahActive && playbackService.currentAyah?.id == item.ayah.id
+        if isSameAyah {
+            playbackService.togglePlayPause()
+        } else {
+            await playbackService.play(surah: surah,
+                                       ayah: item.ayah,
+                                       track: currentTrack,
+                                       startTime: 0,
+                                       userInitiated: true)
+        }
     }
 
     func markAsUnplayed(_ item: AyahItem) {
@@ -135,6 +173,31 @@ final class SurahDetailViewModel: ObservableObject {
         downloadManager.downloadSurahFully(surah: surah, track: track)
     }
 
+    func downloadCurrentTrack() {
+        downloadManager.downloadSurahFully(surah: surah, track: currentTrack)
+    }
+
+    var primaryButtonTitle: String {
+        if isSurahPlaying {
+            return NSLocalizedString("pause_surah_button_label", comment: "Pause the currently playing surah")
+        }
+        if isSurahActive {
+            return NSLocalizedString("resume_surah_button_label", comment: "Resume the paused surah")
+        }
+        return NSLocalizedString("play_surah_button_label", comment: "Play the surah from the beginning")
+    }
+
+    var primaryButtonIconName: String {
+        if isSurahPlaying {
+            return "pause.circle.fill"
+        }
+        return "play.circle.fill"
+    }
+
+    var showRestartButton: Bool {
+        isSurahActive && !ayat.isEmpty
+    }
+
     func removeDownloads() {
         downloadManager.deleteDownloads(for: surah.id)
     }
@@ -143,23 +206,12 @@ final class SurahDetailViewModel: ObservableObject {
         preferencesStore.showBanglaText = visible
     }
 
-    private func updateCurrentAyah(ayah: Ayah?, surah: Surah?) async {
-        guard surah?.id == self.surah.id else {
-            ayat = ayat.map { AyahItem(ayah: $0.ayah, status: $0.status, isPlaying: false) }
-            return
-        }
-        ayat = ayat.map { item in
-            AyahItem(ayah: item.ayah,
-                     status: progressStore.status(for: self.surah.id, ayahNumber: item.ayah.numberInSurah),
-                     isPlaying: item.ayah.id == ayah?.id)
-        }
-    }
-
-    private func refreshStatuses() async {
+    private func refreshStatuses() {
         ayat = ayat.map { item in
             AyahItem(ayah: item.ayah,
                      status: progressStore.status(for: surah.id, ayahNumber: item.ayah.numberInSurah),
-                     isPlaying: item.isPlaying)
+                     isCurrent: item.isCurrent,
+                     isActivelyPlaying: item.isCurrent ? isSurahPlaying : false)
         }
     }
 
@@ -175,5 +227,22 @@ final class SurahDetailViewModel: ObservableObject {
         downloadSummary = DownloadSummary(downloadedCount: finished.count,
                                           totalCount: surah.ayahCount,
                                           totalBytes: bytes)
+    }
+
+    private func updatePlaybackState(currentSurah: Surah?, currentAyah: Ayah?, isPlaying: Bool) {
+        let isActive = currentSurah?.id == surah.id
+        isSurahActive = isActive
+        isSurahPlaying = isActive && isPlaying
+        focusedAyahId = isActive ? currentAyah?.id : nil
+
+        ayat = ayat.map { item in
+            let status = progressStore.status(for: surah.id, ayahNumber: item.ayah.numberInSurah)
+            let isCurrent = isActive && item.ayah.id == currentAyah?.id
+            let activelyPlaying = isCurrent ? isSurahPlaying : false
+            return AyahItem(ayah: item.ayah,
+                            status: status,
+                            isCurrent: isCurrent,
+                            isActivelyPlaying: activelyPlaying)
+        }
     }
 }

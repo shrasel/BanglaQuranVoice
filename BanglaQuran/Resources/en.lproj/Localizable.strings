@@ -49,3 +49,11 @@
 "download_summary_section_header" = "Downloads";
 "download_summary_size_format" = "Disk usage: %@";
 "delete_downloads_button" = "Delete downloads";
+"surah_playback_section_header" = "Playback";
+"play_surah_button_label" = "Play Surah";
+"resume_surah_button_label" = "Resume Surah";
+"pause_surah_button_label" = "Pause Surah";
+"restart_surah_button_label" = "Restart Surah";
+"audio_track_picker_label" = "Audio Track";
+"download_current_track_button" = "Download Current Track";
+"resume_button_label" = "Resume";

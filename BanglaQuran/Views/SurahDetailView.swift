@@ -5,69 +5,41 @@ import UIKit
 
 struct SurahDetailView: View {
     @StateObject var viewModel: SurahDetailViewModel
-    @EnvironmentObject private var playbackViewModel: PlaybackViewModel
 
     init(viewModel: SurahDetailViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
 
     var body: some View {
-        List {
-            Section {
-                Toggle(isOn: Binding(get: { viewModel.showBanglaText }, set: { viewModel.toggleBanglaVisibility($0) })) {
-                    Text(NSLocalizedString("toggle_bangla_text", comment: "Toggle Bangla text label"))
+        ScrollViewReader { proxy in
+            List {
+                playbackSection
+                displaySection
+                downloadSummarySection
+                if let error = viewModel.errorMessage, viewModel.ayat.isEmpty {
+                    errorSection(error: error)
+                }
+                ayahSection
+            }
+            .listStyle(.plain)
+            .navigationTitle(viewModel.surah.englishName)
+            .navigationBarTitleDisplayMode(.inline)
+            .overlay {
+                if viewModel.isLoading && viewModel.ayat.isEmpty {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(.systemBackground).opacity(0.8))
                 }
             }
-
-            Section(header: Text(NSLocalizedString("download_summary_section_header", comment: "Download summary header"))) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(viewModel.downloadSummary.formattedCount)
-                        .font(.subheadline)
-                    Text(String(format: NSLocalizedString("download_summary_size_format", comment: "Download size format"), viewModel.downloadSummary.formattedSize))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Button(role: .destructive) {
-                    viewModel.removeDownloads()
-                } label: {
-                    Text(NSLocalizedString("delete_downloads_button", comment: "Delete downloads button"))
-                }
-                .disabled(viewModel.downloadSummary.downloadedCount == 0)
-            }
-
-            Section(header: Text(NSLocalizedString("ayah_section_header", comment: "Ayah section header"))) {
-                ForEach(viewModel.ayat) { item in
-                    AyahRowView(item: item,
-                                showBanglaText: viewModel.showBanglaText,
-                                playAction: {
-                                    Task { await viewModel.play(ayah: item) }
-                                },
-                                markUnplayedAction: {
-                                    viewModel.markAsUnplayed(item)
-                                },
-                                downloadAction: {
-                                    viewModel.downloadAyah(item)
-                                },
-                                copyArabicAction: {
-                                    #if canImport(UIKit)
-                                    UIPasteboard.general.string = item.ayah.arabicText
-                                    #endif
-                                },
-                                copyBanglaAction: {
-                                    #if canImport(UIKit)
-                                    if let text = item.ayah.banglaText {
-                                        UIPasteboard.general.string = text
-                                    }
-                                    #endif
-                                })
+            .onChange(of: viewModel.focusedAyahId) { id in
+                guard let id else { return }
+                withAnimation {
+                    proxy.scrollTo(id, anchor: .center)
                 }
             }
         }
-        .listStyle(.plain)
-        .navigationTitle(viewModel.surah.englishName)
-        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(NSLocalizedString("download_arabic_track", comment: "Download Arabic track")) {
                         viewModel.downloadSurah(track: .arabicRecitation)
@@ -79,17 +51,131 @@ struct SurahDetailView: View {
                     Image(systemName: "arrow.down.circle")
                 }
                 .accessibilityLabel(NSLocalizedString("download_menu_accessibility", comment: "Download menu"))
-
-                Button {
-                    Task { await viewModel.toggleTrack() }
-                } label: {
-                    Text(viewModel.currentTrack.localizedToggleLabel)
-                }
-                .accessibilityLabel(NSLocalizedString("toggle_track_accessibility", comment: "Toggle track"))
             }
         }
         .task {
             await viewModel.load()
+        }
+    }
+
+    private var playbackSection: some View {
+        Section(header: Text(NSLocalizedString("surah_playback_section_header", comment: "Playback section header"))) {
+            VStack(alignment: .leading, spacing: 16) {
+                Button {
+                    Task { await viewModel.handlePrimaryAction() }
+                } label: {
+                    Label(viewModel.primaryButtonTitle, systemImage: viewModel.primaryButtonIconName)
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+
+                if viewModel.showRestartButton {
+                    Button {
+                        Task { await viewModel.restartSurah() }
+                    } label: {
+                        Label(NSLocalizedString("restart_surah_button_label", comment: "Restart surah"), systemImage: "gobackward")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(NSLocalizedString("audio_track_picker_label", comment: "Audio track picker label"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: Binding(get: { viewModel.currentTrack }, set: { track in
+                        Task { await viewModel.selectTrack(track) }
+                    })) {
+                        ForEach(AudioTrack.allCases) { track in
+                            Text(track.displayName).tag(track)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Button {
+                    viewModel.downloadCurrentTrack()
+                } label: {
+                    Label(NSLocalizedString("download_current_track_button", comment: "Download current track"), systemImage: "arrow.down.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var displaySection: some View {
+        Section {
+            Toggle(isOn: Binding(get: { viewModel.showBanglaText }, set: { viewModel.toggleBanglaVisibility($0) })) {
+                Text(NSLocalizedString("toggle_bangla_text", comment: "Toggle Bangla text label"))
+            }
+        }
+    }
+
+    private var downloadSummarySection: some View {
+        Section(header: Text(NSLocalizedString("download_summary_section_header", comment: "Download summary header"))) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(viewModel.downloadSummary.formattedCount)
+                    .font(.subheadline)
+                Text(String(format: NSLocalizedString("download_summary_size_format", comment: "Download size format"), viewModel.downloadSummary.formattedSize))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button(role: .destructive) {
+                viewModel.removeDownloads()
+            } label: {
+                Text(NSLocalizedString("delete_downloads_button", comment: "Delete downloads button"))
+            }
+            .disabled(viewModel.downloadSummary.downloadedCount == 0)
+        }
+    }
+
+    private var ayahSection: some View {
+        Section(header: Text(NSLocalizedString("ayah_section_header", comment: "Ayah section header"))) {
+            ForEach(viewModel.ayat) { item in
+                AyahRowView(item: item,
+                            showBanglaText: viewModel.showBanglaText,
+                            surahIsPlaying: viewModel.isSurahPlaying,
+                            playAction: {
+                                Task { await viewModel.handleAyahTapped(item) }
+                            },
+                            markUnplayedAction: {
+                                viewModel.markAsUnplayed(item)
+                            },
+                            downloadAction: {
+                                viewModel.downloadAyah(item)
+                            },
+                            copyArabicAction: {
+                                #if canImport(UIKit)
+                                UIPasteboard.general.string = item.ayah.arabicText
+                                #endif
+                            },
+                            copyBanglaAction: {
+                                #if canImport(UIKit)
+                                if let text = item.ayah.banglaText {
+                                    UIPasteboard.general.string = text
+                                }
+                                #endif
+                            })
+                    .id(item.id)
+            }
+        }
+    }
+
+    private func errorSection(error: String) -> some View {
+        Section {
+            VStack(spacing: 12) {
+                Text(error)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                Button(NSLocalizedString("retry_label", comment: "Retry")) {
+                    Task { await viewModel.load(force: true) }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
         }
     }
 }
@@ -97,6 +183,7 @@ struct SurahDetailView: View {
 private struct AyahRowView: View {
     let item: SurahDetailViewModel.AyahItem
     let showBanglaText: Bool
+    let surahIsPlaying: Bool
     let playAction: () -> Void
     let markUnplayedAction: () -> Void
     let downloadAction: () -> Void
@@ -124,15 +211,23 @@ private struct AyahRowView: View {
                     Button {
                         playAction()
                     } label: {
-                        Label(item.isPlaying ? NSLocalizedString("pause_button_label", comment: "Pause label") : NSLocalizedString("play_button_label", comment: "Play label"), systemImage: item.isPlaying ? "pause.circle" : "play.circle")
+                        Label(buttonTitle, systemImage: buttonIcon)
                             .labelStyle(.titleAndIcon)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(item.isPlaying ? .accentColor : .secondary)
+                    .tint(item.isActivelyPlaying ? .accentColor : .secondary)
                 }
             }
         }
         .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background {
+            if item.isCurrent {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.accentColor.opacity(0.1))
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
         .contextMenu {
             Button(NSLocalizedString("context_play_from_here", comment: "Play from here")) {
                 playAction()
@@ -175,5 +270,22 @@ private struct AyahRowView: View {
             .background(color.opacity(0.15))
             .foregroundColor(color)
             .clipShape(Capsule())
+    }
+
+    private var buttonTitle: String {
+        if item.isCurrent {
+            if surahIsPlaying {
+                return NSLocalizedString("pause_button_label", comment: "Pause label")
+            }
+            return NSLocalizedString("resume_button_label", comment: "Resume label")
+        }
+        return NSLocalizedString("play_button_label", comment: "Play label")
+    }
+
+    private var buttonIcon: String {
+        if item.isCurrent {
+            return surahIsPlaying ? "pause.circle.fill" : "play.circle.fill"
+        }
+        return "play.circle"
     }
 }

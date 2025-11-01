@@ -65,15 +65,19 @@ xcodebuild -scheme BanglaQuran \
 
 - `AppEnvironment` centralizes dependency creation and injects repositories, services, and view models throughout the SwiftUI hierarchy.
 - `ManifestQuranRepository` loads surah metadata from `Resources/surahs_manifest.json` and synthesizes placeholder ayah text; update this file when real content becomes available.
+- Full surah text and Bangla translation are fetched on demand from the public `api.alquran.cloud` endpoint and cached to disk for offline reuse.
 - `AudioPlaybackService` orchestrates `AVPlayer`, updates Now Playing metadata, manages remote command center hooks, and records listening state in `ListeningProgressStore`.
 - `DownloadManager` uses a background `URLSession` to cache ayah audio locally, persisting successful downloads and restoring them on relaunch.
 - View models (e.g., `SurahListViewModel`, `PlaybackViewModel`) are `@MainActor`-isolated and leverage Swift concurrency for async loading.
+- Streaming playback currently uses the open `cdn.islamic.network` endpoints (Alafasy recitation and `bn.bengali` narration); swap the base URLs if you need a different reciter or CDN.
 
 ## Localization & Content
 
 - Localized strings live under `Resources/en.lproj` and `Resources/bn.lproj`.
 - The surah manifest (`surahs_manifest.json`) currently contains seed data. Replace it with real metadata/URLs when production-ready.
 - Audio URLs are stubbed (`https://cdn.quranbanglaplayer.example/...`); configure the real CDN endpoint or integrate download authentication as needed.
+   - The current implementation points to `https://cdn.islamic.network` for both Arabic (`ar.alafasy`) and Bangla (`bn.bengali`) audio streams.
+   - Text content is retrieved from `https://api.alquran.cloud` (Arabic: `ar.alafasy`, Bangla: `bn.bengali`) and stored in the ayah cache directory.
 
 ## Testing
 

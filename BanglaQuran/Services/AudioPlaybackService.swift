@@ -49,9 +49,29 @@ final class AudioPlaybackService: NSObject, ObservableObject {
     }
 
     func toggleTrack() async {
-        guard let surah = currentSurah, let ayah = currentAyah else { return }
         let nextTrack: AudioTrack = currentTrack == .arabicRecitation ? .banglaTranslation : .arabicRecitation
-        await play(surah: surah, ayah: ayah, track: nextTrack, startTime: 0, userInitiated: true)
+        await setTrack(nextTrack)
+    }
+
+    func setTrack(_ track: AudioTrack) async {
+        guard track != currentTrack else { return }
+        let wasPlaying = isPlaying
+        let resumeTime = player?.currentTime().seconds ?? 0
+        currentTrack = track
+
+        guard let surah = currentSurah, let ayah = currentAyah else { return }
+
+        await play(surah: surah,
+                   ayah: ayah,
+                   track: track,
+                   startTime: resumeTime,
+                   userInitiated: true)
+
+        if !wasPlaying {
+            player?.pause()
+            isPlaying = false
+            updateNowPlayingInfo()
+        }
     }
 
     func togglePlayPause() {

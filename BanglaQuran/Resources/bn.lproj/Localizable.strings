@@ -49,3 +49,11 @@
 "download_summary_section_header" = "ডাউনলোড";
 "download_summary_size_format" = "ডিস্ক ব্যবহার: %@";
 "delete_downloads_button" = "ডাউনলোড মুছুন";
+"surah_playback_section_header" = "প্লেব্যাক";
+"play_surah_button_label" = "সূরা চালান";
+"resume_surah_button_label" = "সূরা আবার চালান";
+"pause_surah_button_label" = "সূরা বিরতি দিন";
+"restart_surah_button_label" = "সূরা শুরু থেকে চালান";
+"audio_track_picker_label" = "অডিও ট্র্যাক";
+"download_current_track_button" = "বর্তমান ট্র্যাক ডাউনলোড";
+"resume_button_label" = "আবার চালান";
