@@ -16,6 +16,10 @@ struct SurahDetailView: View {
                 playbackSection
                 displaySection
                 downloadSummarySection
+                if let arabic = viewModel.openingBismillahArabic {
+                    openingBismillahSection(arabic: arabic,
+                                             bangla: viewModel.openingBismillahBangla)
+                }
                 if let error = viewModel.errorMessage, viewModel.ayat.isEmpty {
                     errorSection(error: error)
                 }
@@ -43,9 +47,6 @@ struct SurahDetailView: View {
                 Menu {
                     Button(NSLocalizedString("download_arabic_track", comment: "Download Arabic track")) {
                         viewModel.downloadSurah(track: .arabicRecitation)
-                    }
-                    Button(NSLocalizedString("download_bangla_track", comment: "Download Bangla track")) {
-                        viewModel.downloadSurah(track: .banglaTranslation)
                     }
                 } label: {
                     Image(systemName: "arrow.down.circle")
@@ -94,13 +95,15 @@ struct SurahDetailView: View {
                     .pickerStyle(.segmented)
                 }
 
-                Button {
-                    viewModel.downloadCurrentTrack()
-                } label: {
-                    Label(NSLocalizedString("download_current_track_button", comment: "Download current track"), systemImage: "arrow.down.circle")
-                        .frame(maxWidth: .infinity)
+                if viewModel.downloadsEnabled {
+                    Button {
+                        viewModel.downloadCurrentTrack()
+                    } label: {
+                        Label(NSLocalizedString("download_current_track_button", comment: "Download current track"), systemImage: "arrow.down.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
             .padding(.vertical, 4)
         }
@@ -132,12 +135,31 @@ struct SurahDetailView: View {
         }
     }
 
+    private func openingBismillahSection(arabic: String, bangla: String?) -> some View {
+        Section {
+            VStack(spacing: 8) {
+                Text(arabic)
+                    .font(.largeTitle)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                if let bangla {
+                    Text(bangla)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+    }
+
     private var ayahSection: some View {
         Section(header: Text(NSLocalizedString("ayah_section_header", comment: "Ayah section header"))) {
             ForEach(viewModel.ayat) { item in
                 AyahRowView(item: item,
                             showBanglaText: viewModel.showBanglaText,
                             surahIsPlaying: viewModel.isSurahPlaying,
+                            downloadsEnabled: viewModel.downloadsEnabled,
                             playAction: {
                                 Task { await viewModel.handleAyahTapped(item) }
                             },
@@ -184,6 +206,7 @@ private struct AyahRowView: View {
     let item: SurahDetailViewModel.AyahItem
     let showBanglaText: Bool
     let surahIsPlaying: Bool
+    let downloadsEnabled: Bool
     let playAction: () -> Void
     let markUnplayedAction: () -> Void
     let downloadAction: () -> Void
@@ -235,8 +258,10 @@ private struct AyahRowView: View {
             Button(NSLocalizedString("context_mark_unplayed", comment: "Mark as unplayed")) {
                 markUnplayedAction()
             }
-            Button(NSLocalizedString("context_download_ayah", comment: "Download this ayah")) {
-                downloadAction()
+            if downloadsEnabled {
+                Button(NSLocalizedString("context_download_ayah", comment: "Download this ayah")) {
+                    downloadAction()
+                }
             }
             Button(NSLocalizedString("context_copy_arabic", comment: "Copy Arabic")) {
                 copyArabicAction()

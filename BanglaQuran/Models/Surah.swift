@@ -25,6 +25,10 @@ struct Surah: Identifiable, Codable, Hashable {
     let ayahCount: Int
 
     var displayName: String { "\(id). \(englishName)" }
+
+    var showsOpeningBismillah: Bool {
+        id != 9
+    }
 }
 
 struct Ayah: Identifiable, Codable, Hashable {
@@ -32,6 +36,7 @@ struct Ayah: Identifiable, Codable, Hashable {
     let numberInSurah: Int
     let arabicText: String
     let banglaText: String?
+    let banglaBismillah: String?
 
     var id: String { "\(surahId)-\(numberInSurah)" }
 }

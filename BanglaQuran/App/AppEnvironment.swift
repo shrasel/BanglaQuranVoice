@@ -22,8 +22,8 @@ final class AppEnvironment: ObservableObject {
     lazy var progressViewModel = ProgressViewModel(store: progressStore)
 
     init() {
-        let repository = ManifestQuranRepository()
         let preferences = PreferencesStore()
+        let repository = ManifestQuranRepository(preferencesStore: preferences)
         let progress = ListeningProgressStore()
         let downloadManager = DownloadManager(repository: repository,
                                               preferencesStore: preferences,

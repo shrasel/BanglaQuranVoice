@@ -100,6 +100,25 @@ final class SurahDetailViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    var downloadsEnabled: Bool {
+        currentTrack == .arabicRecitation
+    }
+
+    var openingBismillahArabic: String? {
+        guard surah.showsOpeningBismillah else { return nil }
+        return NSLocalizedString("bismillah_arabic_text", comment: "Arabic Bismillah header")
+    }
+
+    var openingBismillahBangla: String? {
+        guard surah.showsOpeningBismillah else { return nil }
+        if let firstItem = ayat.first(where: { $0.ayah.numberInSurah == 1 }),
+           let trimmed = firstItem.ayah.banglaBismillah?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !trimmed.isEmpty {
+            return trimmed
+        }
+        return NSLocalizedString("bismillah_bangla_text", comment: "Bangla Bismillah header")
+    }
+
     func load(force: Bool = false) async {
         guard force || ayat.isEmpty else { return }
         isLoading = true
@@ -166,14 +185,17 @@ final class SurahDetailViewModel: ObservableObject {
     }
 
     func downloadAyah(_ item: AyahItem) {
+        guard downloadsEnabled else { return }
         downloadManager.downloadAyah(surahId: surah.id, ayahNumber: item.ayah.numberInSurah, track: currentTrack)
     }
 
     func downloadSurah(track: AudioTrack) {
+        guard track == .arabicRecitation else { return }
         downloadManager.downloadSurahFully(surah: surah, track: track)
     }
 
     func downloadCurrentTrack() {
+        guard downloadsEnabled else { return }
         downloadManager.downloadSurahFully(surah: surah, track: currentTrack)
     }
 
@@ -217,7 +239,8 @@ final class SurahDetailViewModel: ObservableObject {
 
     private func refreshDownloadSummary() {
         let finished = downloadManager.records.values.compactMap { record -> Int64? in
-            guard record.key.surahId == surah.id else { return nil }
+            guard record.key.surahId == surah.id,
+                  record.key.track == .arabicRecitation else { return nil }
             if case let .finished(_, bytes) = record.status {
                 return bytes
             }

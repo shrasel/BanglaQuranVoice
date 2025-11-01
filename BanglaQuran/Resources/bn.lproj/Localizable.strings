@@ -10,7 +10,11 @@
 "mini_player_subtitle_format" = "%@ · আয়াত %d";
 "preferences_playback_section" = "প্লেব্যাক";
 "arabic_reciter_picker" = "আরবি কারী";
+"arabic_script_picker" = "আরবি লিপি";
 "bangla_narrator_picker" = "বাংলা বর্ণনাকারী";
+"arabic_script_indo_pak" = "ইন্দো-পাক";
+"arabic_script_uthmani" = "উসমানী";
+"narrator_ai_bangla_male" = "বাংলা এআই কণ্ঠ (পুরুষ)";
 "auto_download_toggle" = "ওয়াই-ফাইতে পরবর্তী আয়াত নিজে ডাউনলোড";
 "preferences_display_section" = "প্রদর্শন";
 "show_bangla_text_toggle" = "বাংলা লেখা দেখান";
@@ -57,3 +61,5 @@
 "audio_track_picker_label" = "অডিও ট্র্যাক";
 "download_current_track_button" = "বর্তমান ট্র্যাক ডাউনলোড";
 "resume_button_label" = "আবার চালান";
+"bismillah_arabic_text" = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيم";
+"bismillah_bangla_text" = "বিসমিল্লাহির রহমানির রহিম";

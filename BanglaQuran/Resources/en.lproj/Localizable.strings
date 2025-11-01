@@ -10,7 +10,11 @@
 "mini_player_subtitle_format" = "%@ · Ayah %d";
 "preferences_playback_section" = "Playback";
 "arabic_reciter_picker" = "Arabic Reciter";
+"arabic_script_picker" = "Arabic Script";
 "bangla_narrator_picker" = "Bangla Narrator";
+"arabic_script_indo_pak" = "Indo-Pak";
+"arabic_script_uthmani" = "Uthmani";
+"narrator_ai_bangla_male" = "Bangla AI Narrator (Male)";
 "auto_download_toggle" = "Auto-download next ayah on Wi-Fi";
 "preferences_display_section" = "Display";
 "show_bangla_text_toggle" = "Show Bangla text";
@@ -57,3 +61,5 @@
 "audio_track_picker_label" = "Audio Track";
 "download_current_track_button" = "Download Current Track";
 "resume_button_label" = "Resume";
+"bismillah_arabic_text" = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيم";
+"bismillah_bangla_text" = "বিসমিল্লাহির রহমানির রহিম";

@@ -75,6 +75,7 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     func downloadAyah(surahId: Int, ayahNumber: Int, track: AudioTrack, autoDownload: Bool = false) {
+        guard track == .arabicRecitation else { return }
         let key = DownloadKey(surahId: surahId, ayahNumber: ayahNumber, track: track)
         if let existing = records[key], case .finished = existing.status {
             return
@@ -97,6 +98,7 @@ final class DownloadManager: NSObject, ObservableObject {
     }
 
     func downloadSurahFully(surah: Surah, track: AudioTrack) {
+        guard track == .arabicRecitation else { return }
         for ayah in 1...surah.ayahCount {
             downloadAyah(surahId: surah.id, ayahNumber: ayah, track: track)
         }

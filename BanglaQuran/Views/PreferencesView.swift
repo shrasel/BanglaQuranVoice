@@ -11,6 +11,11 @@ struct PreferencesView: View {
                         Text(reciter.displayName).tag(reciter)
                     }
                 }
+                Picker(NSLocalizedString("arabic_script_picker", comment: "Arabic script picker"), selection: $viewModel.selectedArabicScript) {
+                    ForEach(viewModel.availableArabicScripts) { script in
+                        Text(script.displayName).tag(script)
+                    }
+                }
                 Picker(NSLocalizedString("bangla_narrator_picker", comment: "Bangla narrator picker"), selection: $viewModel.selectedBanglaNarrator) {
                     ForEach(viewModel.availableBanglaNarrators) { narrator in
                         Text(narrator.displayName).tag(narrator)

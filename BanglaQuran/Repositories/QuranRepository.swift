@@ -42,14 +42,19 @@ final class ManifestQuranRepository: QuranRepositoryProtocol {
     private var surahCache: [Surah] = []
     private var ayahCache: [Int: [Ayah]] = [:]
     private var ayahOffsets: [Int: Int] = [:]
+    private var selectedArabicScript: PreferencesStore.ArabicScript
     private let cacheQueue = DispatchQueue(label: "ManifestQuranRepository.cache", qos: .userInitiated)
     private let session: URLSession
     private let fileManager: FileManager
     private let ayahCacheDirectory: URL
+    private var cancellables: Set<AnyCancellable> = []
 
-    init(session: URLSession = .shared, fileManager: FileManager = .default) {
+    init(preferencesStore: PreferencesStore? = nil,
+         session: URLSession = .shared,
+         fileManager: FileManager = .default) {
         self.session = session
         self.fileManager = fileManager
+        self.selectedArabicScript = preferencesStore?.selectedArabicScript ?? .indoPak
         let baseDirectory: URL
         if let caches = try? fileManager.url(for: .cachesDirectory,
                                              in: .userDomainMask,
@@ -65,6 +70,13 @@ final class ManifestQuranRepository: QuranRepositoryProtocol {
             try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         }
         self.ayahCacheDirectory = directory
+
+        preferencesStore?.$selectedArabicScript
+            .removeDuplicates()
+            .sink { [weak self] script in
+                self?.handleArabicScriptChange(script)
+            }
+            .store(in: &cancellables)
     }
 
     func loadSurahs() async throws -> [Surah] {
@@ -104,7 +116,9 @@ final class ManifestQuranRepository: QuranRepositoryProtocol {
             throw NSError(domain: "ManifestQuranRepository", code: 404, userInfo: [NSLocalizedDescriptionKey: "Missing surah metadata"])
         }
 
-        async let arabicTask = fetchAyat(surahId: surah.id, edition: "ar.alafasy")
+        let arabicEdition = cacheQueue.sync { selectedArabicScript.apiEditionCode }
+
+        async let arabicTask = fetchAyat(surahId: surah.id, edition: arabicEdition)
         async let banglaTask = fetchAyat(surahId: surah.id, edition: "bn.bengali")
 
         let (arabicAyat, banglaAyat) = try await (arabicTask, banglaTask)
@@ -112,10 +126,14 @@ final class ManifestQuranRepository: QuranRepositoryProtocol {
 
         let ayat = arabicAyat.map { arabic -> Ayah in
             let translation = banglaMap[arabic.numberInSurah]
+            let extraction = Self.extractBanglaBismillah(from: translation,
+                                                         surahId: surah.id,
+                                                         ayahNumber: arabic.numberInSurah)
             return Ayah(surahId: surah.id,
                         numberInSurah: arabic.numberInSurah,
                         arabicText: arabic.text,
-                        banglaText: translation)
+                        banglaText: extraction.cleanedTranslation,
+                        banglaBismillah: extraction.bismillah)
         }
 
         cacheQueue.async { [weak self] in
@@ -199,5 +217,66 @@ final class ManifestQuranRepository: QuranRepositoryProtocol {
             runningTotal += surah.ayahCount
         }
         return offsets
+    }
+
+    private func handleArabicScriptChange(_ script: PreferencesStore.ArabicScript) {
+        cacheQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.selectedArabicScript != script else { return }
+            self.selectedArabicScript = script
+            self.ayahCache.removeAll()
+            self.clearAyahDiskCache()
+        }
+    }
+
+    private func clearAyahDiskCache() {
+        let urls = (try? fileManager.contentsOfDirectory(at: ayahCacheDirectory,
+                                                         includingPropertiesForKeys: nil,
+                                                         options: [.skipsHiddenFiles])) ?? []
+        for url in urls where url.pathExtension == "json" {
+            try? fileManager.removeItem(at: url)
+        }
+    }
+
+    private static func extractBanglaBismillah(from original: String?,
+                                               surahId: Int,
+                                               ayahNumber: Int) -> (cleanedTranslation: String?, bismillah: String?) {
+        guard var text = original?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return (nil, nil)
+        }
+
+        text = text.replacingOccurrences(of: "﷽", with: "")
+
+        let shouldInclude = ayahNumber == 1
+        guard shouldInclude else {
+            return (text.isEmpty ? nil : text, nil)
+        }
+
+        let canonical = "বিসমিল্লাহির রহমানির রহিম"
+        let variations: [String] = [
+            canonical,
+            "বিসমিল্লাহির রাহমানির রহিম",
+            "বিসমিল্লাহির রাহমানির রাহীম",
+            "বিসমিল্লাহির রহমানির রাহীম",
+            "বিসমিল্লাহির রহমানির রাহীম।",
+            "বিসমিল্লাহির রাহমানির রহিম।"
+        ]
+
+        let trimmingCharacters = CharacterSet(charactersIn: "।!,:;—–- ")
+
+        for variation in variations {
+            if text.hasPrefix(variation) {
+                let remainder = text.dropFirst(variation.count).trimmingCharacters(in: trimmingCharacters)
+                return (remainder.isEmpty ? nil : String(remainder), variation)
+            }
+        }
+
+        // Some editions omit Bismillah entirely for Surah 9 only. For all others, inject canonical phrase.
+        if surahId != 9 {
+            let remainder = text.trimmingCharacters(in: trimmingCharacters)
+            return (remainder.isEmpty ? nil : remainder, canonical)
+        }
+
+        return (text.isEmpty ? nil : text, nil)
     }
 }

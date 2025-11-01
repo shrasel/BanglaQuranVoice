@@ -66,17 +66,24 @@ xcodebuild -scheme BanglaQuran \
 - `AppEnvironment` centralizes dependency creation and injects repositories, services, and view models throughout the SwiftUI hierarchy.
 - `ManifestQuranRepository` loads surah metadata from `Resources/surahs_manifest.json` and synthesizes placeholder ayah text; update this file when real content becomes available.
 - Full surah text and Bangla translation are fetched on demand from the public `api.alquran.cloud` endpoint and cached to disk for offline reuse.
-- `AudioPlaybackService` orchestrates `AVPlayer`, updates Now Playing metadata, manages remote command center hooks, and records listening state in `ListeningProgressStore`.
+- `AudioPlaybackService` orchestrates `AVPlayer`, updates Now Playing metadata, manages remote command center hooks, and records listening state in `ListeningProgressStore`. Arabic recitation streams from the CDN while Bangla narration prefers the Azure Neural TTS male voice (`bn-BD-PradeepNeural`) for lifelike delivery when credentials are provided, and gracefully falls back to on-device `AVSpeechSynthesizer` if the cloud service is unavailable.
 - `DownloadManager` uses a background `URLSession` to cache ayah audio locally, persisting successful downloads and restoring them on relaunch.
 - View models (e.g., `SurahListViewModel`, `PlaybackViewModel`) are `@MainActor`-isolated and leverage Swift concurrency for async loading.
-- Streaming playback currently uses the open `cdn.islamic.network` endpoints (Alafasy recitation and `bn.bengali` narration); swap the base URLs if you need a different reciter or CDN.
+- Streaming playback currently uses the open `cdn.islamic.network` endpoint for the Alafasy Arabic recitation; Bangla playback relies on Apple TTS so no external stream is required.
+
+### Bangla narration voice
+
+- **AI narration (default):** Set the environment variables `AZURE_TTS_KEY` and `AZURE_TTS_REGION` (or add `AzureSpeechKey` / `AzureSpeechRegion` to `Info.plist`) to enable Azure Neural TTS. The app will cache synthesized clips per ayah using the male `bn-BD-PradeepNeural` voice.
+- **Offline fallback:** When credentials are missing or the network request fails, playback reverts to the best on-device Bangla voice available via `AVSpeechSynthesizer` so translation still works offline.
+- Pronunciation adjustments for common invocations (e.g., “﷽”, “ﷺ”) are normalized before synthesis. Extend `banglaPronunciationOverrides` in `AudioPlaybackService` if you notice additional words that need custom handling.
 
 ## Localization & Content
 
 - Localized strings live under `Resources/en.lproj` and `Resources/bn.lproj`.
 - The surah manifest (`surahs_manifest.json`) currently contains seed data. Replace it with real metadata/URLs when production-ready.
 - Audio URLs are stubbed (`https://cdn.quranbanglaplayer.example/...`); configure the real CDN endpoint or integrate download authentication as needed.
-   - The current implementation points to `https://cdn.islamic.network` for both Arabic (`ar.alafasy`) and Bangla (`bn.bengali`) audio streams.
+   - The current implementation points to `https://cdn.islamic.network` for Arabic (`ar.alafasy`) audio streams.
+   - Bangla narration is synthesized locally via `AVSpeechSynthesizer`; no remote files are bundled, and downloads are disabled for the Bangla track.
    - Text content is retrieved from `https://api.alquran.cloud` (Arabic: `ar.alafasy`, Bangla: `bn.bengali`) and stored in the ayah cache directory.
 
 ## Testing

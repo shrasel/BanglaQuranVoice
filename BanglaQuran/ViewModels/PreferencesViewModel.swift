@@ -11,6 +11,10 @@ final class PreferencesViewModel: ObservableObject {
         didSet { store.selectedBanglaNarrator = selectedBanglaNarrator }
     }
 
+    @Published var selectedArabicScript: PreferencesStore.ArabicScript {
+        didSet { store.selectedArabicScript = selectedArabicScript }
+    }
+
     @Published var showBanglaText: Bool {
         didSet { store.showBanglaText = showBanglaText }
     }
@@ -25,6 +29,7 @@ final class PreferencesViewModel: ObservableObject {
 
     var availableArabicReciters: [PreferencesStore.Reciter] { store.availableArabicReciters }
     var availableBanglaNarrators: [PreferencesStore.Narrator] { store.availableBanglaNarrators }
+    var availableArabicScripts: [PreferencesStore.ArabicScript] { store.availableArabicScripts }
 
     init(store: PreferencesStore,
          progressStore: ListeningProgressStore,
@@ -34,6 +39,7 @@ final class PreferencesViewModel: ObservableObject {
         self.downloadManager = downloadManager
         self.selectedArabicReciter = store.selectedArabicReciter
         self.selectedBanglaNarrator = store.selectedBanglaNarrator
+        self.selectedArabicScript = store.selectedArabicScript
         self.showBanglaText = store.showBanglaText
         self.autoDownloadNextAyahOnWiFi = store.autoDownloadNextAyahOnWiFi
     }
